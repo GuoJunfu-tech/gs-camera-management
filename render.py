@@ -1,4 +1,6 @@
 import os
+import math
+import argparse
 from typing import NamedTuple
 from os import makedirs
 from argparse import ArgumentParser
@@ -12,6 +14,7 @@ from scene import Scene
 from utils.general_utils import safe_state
 from gaussian_renderer import GaussianModel
 from utils.graphics_utils import focal2fov, fov2focal
+from utils.system_utils import parse_dimensions
 from diff_gaussian_rasterization import (
     GaussianRasterizationSettings,
     GaussianRasterizer,
@@ -27,10 +30,6 @@ class CameraInfo(NamedTuple):
     T: np.array
     FovY: np.array
     FovX: np.array
-    # image: np.array
-    # width: int
-    # height: int
-    # image_path: str
     image_name: str
 
 
@@ -73,6 +72,8 @@ def construct_camera_info_from_transforms(
             FovY = fovy
             FovX = fovx
 
+            name = frame["file_path"].rsplit("/", 1)[-1]
+
             cam_infos.append(
                 CameraInfo(
                     uid=idx,
@@ -80,8 +81,7 @@ def construct_camera_info_from_transforms(
                     T=T,
                     FovY=FovY,
                     FovX=FovX,
-                    width=image_size[0],
-                    height=image_size[1],
+                    image_name=name,
                 )
             )
 
@@ -116,8 +116,8 @@ def render(
         pass
 
     # Set up rasterization configuration
-    tanfovx = math.tan(viewpoint_camera.FoVx * 0.5)
-    tanfovy = math.tan(viewpoint_camera.FoVy * 0.5)
+    tanfovx = math.tan(viewpoint_camera.FovX * 0.5)
+    tanfovy = math.tan(viewpoint_camera.FovY * 0.5)
 
     raster_settings = GaussianRasterizationSettings(
         image_height=int(viewpoint_camera.image_height),
@@ -231,34 +231,42 @@ def render_from_views(
             )
 
 
+def evaluate_args(args):
+    if not os.path.exists(args.output_path):
+        os.mkdir(args.output_path)
+    if not os.path.exists(args.model_path):
+        raise ValueError(f"model path {args.model_path} not existed")
+    if not os.path.exists(args.camera_pose_json):
+        raise ValueError(f"model path {args.camera_pose_json} not existed")
+
+    return parse_dimensions(args.image_shape)
+
+
 if __name__ == "__main__":
-    # Set up command line argument parser
-    # PARSER = ArgumentParser(description="Testing script parameters")
-    # # MODEL = ModelParams(PARSER, sentinel=True)
-    # PIPELINE = PipelineParams(PARSER)
-
-    # PARSER.add_argument("--gs_path", type=str)
-    # PARSER.add_argument("--view_path", type=str)
-
     ROOT = os.getcwd()
-    output_path = os.path.join(ROOT, "output")
-    if not os.path.exists(output_path):
-        os.mkdir(output_path)
 
-    # PARSER.add_argument("--iteration", default=-1, type=int)
-    # PARSER.add_argument("--skip_train", action="store_true")
-    # PARSER.add_argument("--skip_test", action="store_true")
-    # PARSER.add_argument("--quiet", action="store_true")
-    # args = get_combined_args(PARSER)
-
-    # Initialize system state (RNG)
-    # safe_state(args.quiet)
-    gs_path = os.path.join(ROOT, "closet-end-m.ply")
-    view_path = os.path.join(ROOT, "transforms_train.json")
-
-    render_from_views(
-        # PIPELINE.extract(args),
-        gs_path,
-        view_path,
-        output_path,
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-o", "--output_path", type=str, default=os.path.join(ROOT, "output")
     )
+    parser.add_argument("-m", "--model_path", type=str)
+    parser.add_argument(
+        "-c",
+        "--camera_pose_json",
+        type=str,
+        default=os.path.join(ROOT, "transforms_train.json"),
+    )
+    parser.add_argument(
+        "-i",
+        "--image_shape",
+        type=str,
+        default="800x800",
+        help="e.g. 500x500. WARNING: the size should be align to your json file!",
+    )
+    args = parser.parse_args()
+    img_shape = evaluate_args(args)
+
+    print(args, img_shape)
+    exit()
+
+    render_from_views(args, img_shape)
