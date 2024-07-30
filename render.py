@@ -16,6 +16,7 @@ from gaussian_renderer import GaussianModel
 from utils.graphics_utils import focal2fov, fov2focal
 from utils.system_utils import parse_dimensions
 from utils.sh_utils import eval_sh
+from utils.
 from diff_gaussian_rasterization import (
     GaussianRasterizationSettings,
     GaussianRasterizer,
@@ -32,8 +33,11 @@ class CameraInfo(NamedTuple):
     FovY: np.array
     FovX: np.array
     image_name: str
-    height: int
     width: int
+    height: int
+
+class CameraTorch(nn.Module):
+    pass
 
 
 def construct_camera_info_from_transforms(
@@ -94,7 +98,7 @@ def construct_camera_info_from_transforms(
 
 
 def render(
-    viewpoint_camera,
+    camera_info: CameraInfo,
     pc: GaussianModel,
     pipe,
     bg_color: torch.Tensor,
@@ -121,12 +125,12 @@ def render(
         pass
 
     # Set up rasterization configuration
-    tanfovx = math.tan(viewpoint_camera.FovX * 0.5)
-    tanfovy = math.tan(viewpoint_camera.FovY * 0.5)
+    tanfovx = math.tan(camera_info.FovX * 0.5)
+    tanfovy = math.tan(camera_info.FovY * 0.5)
 
     raster_settings = GaussianRasterizationSettings(
-        image_height=int(viewpoint_camera.image_height),
-        image_width=int(viewpoint_camera.image_width),
+        image_height=int(camera_info.height),
+        image_width=int(camera_info.width),
         tanfovx=tanfovx,
         tanfovy=tanfovy,
         bg=bg_color,
@@ -203,13 +207,13 @@ def render_from_views(args, img_shape) -> None:
     gs_path = args.model_path
     output_path = args.output_path
 
-    class PIPE:
+    class PipeParams:
         def __init__(self):
             self.convert_SHs_python = False
             self.compute_cov3D_python = False
             self.debug = False
 
-    pipe = PIPE()
+    pipe = PipeParams()
 
     train_cam_infos = construct_camera_info_from_transforms(view_path)
 
