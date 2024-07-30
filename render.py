@@ -2,19 +2,20 @@ import os
 import math
 import argparse
 from typing import NamedTuple
-from os import makedirs
-from argparse import ArgumentParser
 from typing import List
-import torch
-import torchvision
 import json
 import numpy as np
+import torch
+import torchvision
 from tqdm import tqdm
-from scene import Scene
-from utils.general_utils import safe_state
+
+# from scene import Scene
 from gaussian_renderer import GaussianModel
+
+# from utils.general_utils import safe_state
 from utils.graphics_utils import focal2fov, fov2focal
 from utils.system_utils import parse_dimensions
+from utils.sh_utils import eval_sh
 from diff_gaussian_rasterization import (
     GaussianRasterizationSettings,
     GaussianRasterizer,
@@ -31,6 +32,8 @@ class CameraInfo(NamedTuple):
     FovY: np.array
     FovX: np.array
     image_name: str
+    height: int
+    width: int
 
 
 def construct_camera_info_from_transforms(
@@ -82,6 +85,8 @@ def construct_camera_info_from_transforms(
                     FovY=FovY,
                     FovX=FovX,
                     image_name=name,
+                    width=image_size[0],
+                    height=image_size[1],
                 )
             )
 
@@ -151,7 +156,7 @@ def render(
         scales = pc.get_scaling
         rotations = pc.get_rotation
 
-    # If precomputed colors are provided, use them. Otherwise, if it is desired to precompute colors
+    # If precomputed colors are provided, use them. Otherwise, if it is desired to pre-compute colors
     # from SHs in Python, do it. If not, then SH -> RGB conversion will be done by rasterizer.
     shs = None
     colors_precomp = None
@@ -193,14 +198,10 @@ def render(
     }
 
 
-def render_from_views(
-    # pipe: PipelineParams,
-    gs_path: str,
-    view_path: str,
-    output_path: str,
-) -> None:
-    if not os.path.exists(view_path):
-        raise ValueError(f"path {view_path} does not exist")
+def render_from_views(args, img_shape) -> None:
+    view_path = args.camera_pose_json
+    gs_path = args.model_path
+    output_path = args.output_path
 
     class PIPE:
         def __init__(self):
@@ -267,6 +268,5 @@ if __name__ == "__main__":
     img_shape = evaluate_args(args)
 
     print(args, img_shape)
-    exit()
 
     render_from_views(args, img_shape)
