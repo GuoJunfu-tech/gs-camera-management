@@ -16,28 +16,13 @@ from gaussian_renderer import GaussianModel
 from utils.graphics_utils import focal2fov, fov2focal
 from utils.system_utils import parse_dimensions
 from utils.sh_utils import eval_sh
-from utils.
 from diff_gaussian_rasterization import (
     GaussianRasterizationSettings,
     GaussianRasterizer,
 )
-
+from camera_utils import CameraInfo, CameraTorch, cameraList_from_camInfos
 
 # this file is used to render imgs from given sequence of extrinsic and intrinsic
-
-
-class CameraInfo(NamedTuple):
-    uid: int
-    R: np.array
-    T: np.array
-    FovY: np.array
-    FovX: np.array
-    image_name: str
-    width: int
-    height: int
-
-class CameraTorch(nn.Module):
-    pass
 
 
 def construct_camera_info_from_transforms(
@@ -202,6 +187,10 @@ def render(
     }
 
 
+def camera_info_to_torch(camera_info_list):
+    pass
+
+
 def render_from_views(args, img_shape) -> None:
     view_path = args.camera_pose_json
     gs_path = args.model_path
@@ -216,6 +205,7 @@ def render_from_views(args, img_shape) -> None:
     pipe = PipeParams()
 
     train_cam_infos = construct_camera_info_from_transforms(view_path)
+    train_cam_torch = cameraList_from_camInfos(train_cam_infos)
 
     print("Reading Test Transforms")
     with torch.no_grad():
@@ -228,7 +218,7 @@ def render_from_views(args, img_shape) -> None:
         bg_color = [0, 0, 0]
         background = torch.tensor(bg_color, dtype=torch.float32, device="cuda")
 
-        for id, view in enumerate(train_cam_infos):
+        for id, view in enumerate(train_cam_torch):
             render_img = render(view, gaussians, pipe, background)["render"]
 
             torchvision.utils.save_image(
